@@ -20,17 +20,19 @@ ns_random = os.environ.get("NS_RANDOM","false")
 cookie = os.environ.get("NS_COOKIE") or os.environ.get("COOKIE")
 # 通过环境变量控制是否使用无头模式，默认为 True（无头模式）
 headless = os.environ.get("HEADLESS", "true").lower() == "true"
+# 通过环境变量控制是否自动评论（默认为 True 开启，如果设为 false 则只签到和加鸡腿）
+ns_comment_enable = os.environ.get("NS_COMMENT", "true").lower() == "true"
+# =================================================
 
-# 修改后的代码示例：
 randomInputStr = [
     "绑定",
     "帮顶",
     "好价祝早出",
-    "好价，帮顶了",
+    "帮顶了",
     "不错，顶一下",
     "价格挺合适的",
     "插眼看看",
-    "支持一下"
+    "前排支持一下"
 ]
 
 def click_sign_icon(driver):
@@ -210,37 +212,46 @@ def nodeseek_comment(driver):
                 if is_chicken_leg is False:
                     is_chicken_leg = click_chicken_leg(driver)
                 
-                # 等待 CodeMirror 编辑器加载
-                editor = WebDriverWait(driver, 30).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, '.CodeMirror'))
-                )
-                
-                # 点击编辑器区域获取焦点
-                editor.click()
-                time.sleep(0.5)
-                input_text = random.choice(randomInputStr)
+                # ================= 核心修改区域 =================
+                if ns_comment_enable:
+                    # 如果开关开启，则执行原来的评论逻辑
+                    # 等待 CodeMirror 编辑器加载
+                    editor = WebDriverWait(driver, 30).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, '.CodeMirror'))
+                    )
+                    
+                    # 点击编辑器区域获取焦点
+                    editor.click()
+                    time.sleep(0.5)
+                    input_text = random.choice(randomInputStr)
 
-                # 模拟输入
-                actions = ActionChains(driver)
-                # 随机输入 randomInputStr
-                for char in input_text:
-                    actions.send_keys(char)
-                    actions.pause(random.uniform(0.1, 0.3))
-                actions.perform()
+                    # 模拟输入
+                    actions = ActionChains(driver)
+                    for char in input_text:
+                        actions.send_keys(char)
+                        actions.pause(random.uniform(0.1, 0.3))
+                    actions.perform()
+                    
+                    time.sleep(2)
+                    
+                    # 定位提交按钮并使用 JS 强制点击 (包含之前的防拦截优化)
+                    submit_button = WebDriverWait(driver, 30).until(
+                     EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'submit') and contains(@class, 'btn') and contains(text(), '发布评论')]"))
+                    )
+                    driver.execute_script("arguments[0].scrollIntoView(true);", submit_button)
+                    time.sleep(0.5)
+                    driver.execute_script("arguments[0].click();", submit_button)
+                    
+                    print(f"已在帖子 {post_url} 中完成评论")
+                else:
+                    # 如果开关关闭，直接跳过评论
+                    print(f"帖子 {post_url} 已处理（根据设置跳过评论）")
+                    if is_chicken_leg is True:
+                        print("检测到鸡腿已加上且未开启评论，提前结束逛帖任务！")
+                        break # 直接退出循环，不再访问剩下的帖子
+                # ===============================================
                 
-                # 等待一下确保内容已经输入
-                time.sleep(2)
-                
-                # 使用更精确的选择器定位提交按钮
-                submit_button = WebDriverWait(driver, 30).until(
-                 EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'submit') and contains(@class, 'btn') and contains(text(), '发布评论')]"))
-                )
-                # 确保按钮可见并可点击
-                driver.execute_script("arguments[0].scrollIntoView(true);", submit_button)
-                time.sleep(0.5)
-                submit_button.click()
-                
-                print(f"已在帖子 {post_url} 中完成评论")
+                time.sleep(random.uniform(2,5))
                 
                 # 返回交易区
                 # driver.get(target_url)
