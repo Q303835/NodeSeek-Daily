@@ -21,7 +21,17 @@ cookie = os.environ.get("NS_COOKIE") or os.environ.get("COOKIE")
 # 通过环境变量控制是否使用无头模式，默认为 True（无头模式）
 headless = os.environ.get("HEADLESS", "true").lower() == "true"
 
-randomInputStr = ["bd","绑定","帮顶"]
+# 修改后的代码示例：
+randomInputStr = [
+    "绑定",
+    "帮顶",
+    "好价祝早出",
+    "帮顶了",
+    "不错，顶一下",
+    "价格挺合适的",
+    "插眼看看",
+    "前排支持一下"
+]
 
 def click_sign_icon(driver):
     """
@@ -117,7 +127,12 @@ def setup_driver_and_cookies():
             options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
         print("正在启动Chrome...")
-        driver = uc.Chrome(options=options)
+        # 强制指定青龙面板自带的 Chromium 和 ChromeDriver 路径
+        driver = uc.Chrome(
+            options=options,
+            driver_executable_path='/usr/bin/chromedriver',
+            browser_executable_path='/usr/bin/chromium-browser'
+        )
         
         if headless:
             # 执行 JavaScript 来修改 webdriver 标记
@@ -278,7 +293,7 @@ def click_chicken_leg(driver):
         WebDriverWait(driver, 5).until_not(
             EC.presence_of_element_located((By.CSS_SELECTOR, '.msc-overlay'))
         )
-        time.sleep(1)  # 额外等待以确保对话框完全消失
+        time.sleep(2)  # 额外等待以确保对话框完全消失
         
         return True
         
@@ -297,4 +312,3 @@ if __name__ == "__main__":
     print("脚本执行完成")
     # while True:
     #     time.sleep(1)
-
