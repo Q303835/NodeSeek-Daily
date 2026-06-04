@@ -35,6 +35,32 @@
 3. 可选：添加 `NS_RANDOM` 设置是否随机选择奖励
 4. Actions 会在每天 UTC 16:00（北京时间 00:00）自动运行
 
+## 青龙面板运行
+1. 订阅本仓库
+2. 安装依赖
+青龙面板里安装依赖
+依赖管理----python3---创建依赖，自动拆分。粘贴以下内容
+
+```
+selenium requests curl_cffi beautifulsoup4 undetected-chromedriver webdriver_manager bs4 cloudscraper
+```
+
+Linux依赖
+
+一般是    image: whyour/qinglong:latest 
+```
+chromium chromium-chromedriver font-wqy-zenhei
+```
+
+基于 Debian 的版本：whyour/qinglong:debian
+```
+chromium chromium-driver fonts-wqy-zenhei
+```
+环境变量添加
+`NS_COOKIE` Nodeseek的cookie。
+选择是否开启水帖
+`NS_COMMENT`:是否开启水帖评论默认 true/false（可选，默认 true）
+
 ## 注意事项
 
 - 请确保 Cookie 有效且具有足够的权限
