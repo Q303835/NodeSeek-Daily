@@ -16,13 +16,32 @@ import undetected_chromedriver as uc
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
+# ================= 通知模块 =================
+# 尝试导入青龙面板自带的通知模块
+try:
+    from notify import send
+except ImportError:
+    def send(title, content):
+        print(f"\n[本地运行提示] 未找到青龙 notify.py 文件，跳过通知发送。")
+        print(f"通知标题: {title}")
+        print(f"通知内容:\n{content}")
+
+# 收集推送到手机的通知内容
+notify_content = []
+
+def ql_log(msg):
+    """同时打印日志并加入通知列表"""
+    print(msg)
+    notify_content.append(msg)
+# ==========================================
+
 ns_random = os.environ.get("NS_RANDOM","false")
 cookie = os.environ.get("NS_COOKIE") or os.environ.get("COOKIE")
-# 通过环境变量控制是否使用无头模式，默认为 True（无头模式）
 headless = os.environ.get("HEADLESS", "true").lower() == "true"
-# 通过环境变量控制是否自动评论（默认为 True 开启，如果设为 false 则只签到和加鸡腿）
 ns_comment_enable = os.environ.get("NS_COMMENT", "true").lower() == "true"
-# =================================================
+
+# ✨ 新增：尝试读取环境变量中的用户名
+ns_user = os.environ.get("NS_USER", "")
 
 randomInputStr = [
     "绑定",
@@ -36,100 +55,62 @@ randomInputStr = [
 ]
 
 def click_sign_icon(driver):
-    """
-    尝试点击签到图标和试试手气按钮的通用方法
-    """
     try:
         print("开始查找签到图标...")
-        # 使用更精确的选择器定位签到图标
         sign_icon = WebDriverWait(driver, 30).until(
             EC.presence_of_element_located((By.XPATH, "//span[@title='签到']"))
         )
-        print("找到签到图标，准备点击...")
-        
-        # 确保元素可见和可点击
         driver.execute_script("arguments[0].scrollIntoView(true);", sign_icon)
         time.sleep(0.5)
         
-        # 打印元素信息
-        print(f"签到图标元素: {sign_icon.get_attribute('outerHTML')}")
-        
-        # 尝试点击
         try:
-            
-            
             sign_icon.click()
-            print("签到图标点击成功")
+            ql_log("✅ 签到图标点击成功")
         except Exception as click_error:
-            print(f"点击失败，尝试使用 JavaScript 点击: {str(click_error)}")
             driver.execute_script("arguments[0].click();", sign_icon)
+            ql_log("✅ 签到图标点击成功 (JS强制点击)")
         
-        print("等待页面跳转...")
         time.sleep(5)
         
-        # 打印当前URL
-        print(f"当前页面URL: {driver.current_url}")
-        
-        # 点击"试试手气"按钮
         try:
-            click_button:None
-            
-            if ns_random:
+            if ns_random == "true":
                 click_button = WebDriverWait(driver, 5).until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '试试手气')]"))
-            )
+                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '试试手气')]"))
+                )
+                click_button.click()
+                ql_log("🎁 试试手气点击成功")
             else:
                 click_button = WebDriverWait(driver, 5).until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '鸡腿 x 5')]"))
-            )
-            
-            click_button.click()
-            print("完成试试手气点击")
+                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '鸡腿 x 5')]"))
+                )
+                click_button.click()
+                ql_log("🍗 鸡腿x5 领取成功")
         except Exception as lucky_error:
-            print(f"试试手气按钮点击失败或者签到过了: {str(lucky_error)}")
+            ql_log("⚠️ 试试手气/鸡腿领取失败或已签到过")
             
         return True
         
     except Exception as e:
-        print(f"签到过程中出错:")
-        print(f"错误类型: {type(e).__name__}")
-        print(f"错误信息: {str(e)}")
-        print(f"当前页面URL: {driver.current_url}")
-        print(f"当前页面源码片段: {driver.page_source[:500]}...")
-        print("详细错误信息:")
-        traceback.print_exc()
+        ql_log("❌ 签到过程中出错，可能是Cookie失效或已被拦截")
         return False
 
 def setup_driver_and_cookies():
-    """
-    初始化浏览器并设置cookie的通用方法
-    返回: 设置好cookie的driver实例
-    """
     try:
-        cookie = os.environ.get("NS_COOKIE") or os.environ.get("COOKIE")
-        headless = os.environ.get("HEADLESS", "true").lower() == "true"
-        
         if not cookie:
-            print("未找到cookie配置")
+            ql_log("❌ 未找到 NS_COOKIE 环境变量配置")
             return None
             
-        print("开始初始化浏览器...")
         options = uc.ChromeOptions()
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         
         if headless:
-            print("启用无头模式...")
             options.add_argument('--headless')
-            # 添加以下参数来绕过 Cloudflare 检测
             options.add_argument('--disable-blink-features=AutomationControlled')
             options.add_argument('--disable-gpu')
             options.add_argument('--window-size=1920,1080')
-            # 设置 User-Agent
             options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
-        print("正在启动Chrome...")
-        # 强制指定青龙面板自带的 Chromium 和 ChromeDriver 路径
         driver = uc.Chrome(
             options=options,
             driver_executable_path='/usr/bin/chromedriver',
@@ -137,16 +118,10 @@ def setup_driver_and_cookies():
         )
         
         if headless:
-            # 执行 JavaScript 来修改 webdriver 标记
             driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             driver.set_window_size(1920, 1080)
         
-        print("Chrome启动成功")
-        
-        print("正在设置cookie...")
         driver.get('https://www.nodeseek.com')
-        
-        # 等待页面加载完成
         time.sleep(5)
         
         for cookie_item in cookie.split(';'):
@@ -159,39 +134,29 @@ def setup_driver_and_cookies():
                     'path': '/'
                 })
             except Exception as e:
-                print(f"设置cookie出错: {str(e)}")
                 continue
         
-        print("刷新页面...")
         driver.refresh()
-        time.sleep(5)  # 增加等待时间
-        
+        time.sleep(5) 
         return driver
         
     except Exception as e:
-        print(f"设置浏览器和Cookie时出错: {str(e)}")
-        print("详细错误信息:")
-        print(traceback.format_exc())
+        ql_log(f"❌ 浏览器初始化失败: {str(e)}")
         return None
 
 def nodeseek_comment(driver):
     try:
-        print("正在访问交易区...")
         target_url = 'https://www.nodeseek.com/categories/trade'
         driver.get(target_url)
-        print("等待页面加载...")
+        time.sleep(5)
         
-        # 获取初始帖子列表
         posts = WebDriverWait(driver, 30).until(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, '.post-list-item'))
         )
-        print(f"成功获取到 {len(posts)} 个帖子")
         
-        # 过滤掉置顶帖
         valid_posts = [post for post in posts if not post.find_elements(By.CSS_SELECTOR, '.pined')]
         selected_posts = random.sample(valid_posts, min(20, len(valid_posts)))
         
-        # 存储已选择的帖子URL
         selected_urls = []
         for post in selected_posts:
             try:
@@ -201,31 +166,25 @@ def nodeseek_comment(driver):
                 continue
         
         is_chicken_leg = False
+        comments_count = 0
         
-        # 使用URL列表进行操作
         for i, post_url in enumerate(selected_urls):
             try:
-                print(f"正在处理第 {i+1} 个帖子")
                 driver.get(post_url)
                 
-                # 处理加鸡腿
                 if is_chicken_leg is False:
                     is_chicken_leg = click_chicken_leg(driver)
+                    if is_chicken_leg:
+                        ql_log("🍗 成功给随机帖子加了一个鸡腿")
                 
-                # ================= 核心修改区域 =================
                 if ns_comment_enable:
-                    # 如果开关开启，则执行原来的评论逻辑
-                    # 等待 CodeMirror 编辑器加载
                     editor = WebDriverWait(driver, 30).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, '.CodeMirror'))
                     )
-                    
-                    # 点击编辑器区域获取焦点
                     editor.click()
                     time.sleep(0.5)
                     input_text = random.choice(randomInputStr)
 
-                    # 模拟输入
                     actions = ActionChains(driver)
                     for char in input_text:
                         actions.send_keys(char)
@@ -234,7 +193,6 @@ def nodeseek_comment(driver):
                     
                     time.sleep(2)
                     
-                    # 定位提交按钮并使用 JS 强制点击 (包含之前的防拦截优化)
                     submit_button = WebDriverWait(driver, 30).until(
                      EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'submit') and contains(@class, 'btn') and contains(text(), '发布评论')]"))
                     )
@@ -242,54 +200,39 @@ def nodeseek_comment(driver):
                     time.sleep(0.5)
                     driver.execute_script("arguments[0].click();", submit_button)
                     
-                    print(f"已在帖子 {post_url} 中完成评论")
+                    comments_count += 1
                 else:
-                    # 如果开关关闭，直接跳过评论
-                    print(f"帖子 {post_url} 已处理（根据设置跳过评论）")
                     if is_chicken_leg is True:
-                        print("检测到鸡腿已加上且未开启评论，提前结束逛帖任务！")
-                        break # 直接退出循环，不再访问剩下的帖子
-                # ===============================================
+                        ql_log("💡 评论已关闭且鸡腿已送出，提前结束逛帖任务")
+                        break 
                 
-                time.sleep(random.uniform(2,5))
-                
-                # 返回交易区
-                # driver.get(target_url)
-                # time.sleep(2)  # 等待页面加载
                 time.sleep(random.uniform(2,5))
                 
             except Exception as e:
-                print(f"处理帖子时出错: {str(e)}")
                 continue
                 
-        print("NodeSeek评论任务完成")
+        if ns_comment_enable:
+            ql_log(f"💬 自动评论任务完成，共水了 {comments_count} 个帖子")
                 
     except Exception as e:
-        print(f"NodeSeek评论出错: {str(e)}")
-        print("详细错误信息:")
-        print(traceback.format_exc())
+        ql_log("❌ NodeSeek 逛帖/评论过程出现异常")
 
 def click_chicken_leg(driver):
     try:
-        print("尝试点击加鸡腿按钮...")
         chicken_btn = WebDriverWait(driver, 5).until(
             EC.element_to_be_clickable((By.XPATH, '//div[@class="nsk-post"]//div[@title="加鸡腿"][1]'))
         )
         driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", chicken_btn)
         time.sleep(0.5)
         chicken_btn.click()
-        print("加鸡腿按钮点击成功")
         
-        # 等待确认对话框出现
         WebDriverWait(driver, 5).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, '.msc-confirm'))
         )
         
-        # 检查是否是7天前的帖子
         try:
             error_title = driver.find_element(By.XPATH, "//h3[contains(text(), '该评论创建于7天前')]")
             if error_title:
-                print("该帖子超过7天，无法加鸡腿")
                 ok_btn = driver.find_element(By.CSS_SELECTOR, '.msc-confirm .msc-ok')
                 ok_btn.click()
                 return False
@@ -298,28 +241,44 @@ def click_chicken_leg(driver):
                 EC.element_to_be_clickable((By.CSS_SELECTOR, '.msc-confirm .msc-ok'))
             )
             ok_btn.click()
-            print("确认加鸡腿成功")
             
-        # 等待确认对话框消失
         WebDriverWait(driver, 5).until_not(
             EC.presence_of_element_located((By.CSS_SELECTOR, '.msc-overlay'))
         )
-        time.sleep(2)  # 额外等待以确保对话框完全消失
-        
+        time.sleep(2)
         return True
         
     except Exception as e:
-        print(f"加鸡腿操作失败: {str(e)}")
         return False
 
 if __name__ == "__main__":
-    print("开始执行NodeSeek评论脚本...")
+    global_user = ns_user
+    display_name = f"[{global_user}] " if global_user else ""
+    ql_log(f"=== NodeSeek {display_name}自动化签到报告 ===")
+    
     driver = setup_driver_and_cookies()
-    if not driver:
-        print("浏览器初始化失败")
-        exit(1)
-    nodeseek_comment(driver)
-    click_sign_icon(driver)
-    print("脚本执行完成")
-    # while True:
-    #     time.sleep(1)
+    if driver:
+        # ✨ 自动抓取兜底：如果你没有设置环境变量，尝试从顶部导航栏把你的名字薅下来
+        if not global_user:
+            try:
+                # 寻找页面上第一个空间链接（通常就是顶部登录后的用户头像按钮）
+                user_el = driver.find_element(By.XPATH, "(//a[contains(@href, '/space/')])[1]")
+                if user_el and user_el.text:
+                    global_user = user_el.text.strip()
+                    ql_log(f"💡 自动抓取到用户名: {global_user}")
+            except:
+                pass
+
+        nodeseek_comment(driver)
+        click_sign_icon(driver)
+        ql_log("✅ 脚本所有任务执行完毕")
+        
+        try:
+            driver.quit()
+        except:
+            pass
+    
+    # 汇总消息并通过青龙通知发送（标题带上用户名）
+    title = f"NodeSeek[{global_user}] 每日签到" if global_user else "NodeSeek 每日签到"
+    final_message = "\n".join(notify_content)
+    send(title, final_message)
