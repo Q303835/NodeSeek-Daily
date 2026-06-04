@@ -1,5 +1,10 @@
 # -- coding: utf-8 --
 """
+任务名称
+name: nodeseek论坛每日签到
+定时规则
+cron: 13 9 * * *
+
 Copyright (c) 2024 [Hosea]
 Licensed under the MIT License.
 See LICENSE file in the project root for full license information.
