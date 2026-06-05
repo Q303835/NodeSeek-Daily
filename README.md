@@ -19,7 +19,6 @@
 - `NS_COOKIE`: NodeSeek 的 Cookie（必需）
 - `NS_RANDOM`: 是否随机选择奖励，true/false（可选）
 - `HEADLESS`: 是否使用无头模式，true/false（可选，默认 true）
-- `NS_COMMENT`:是否开启水帖评论默认 true/false（可选，默认 true）
 
 ## 本地运行
 
