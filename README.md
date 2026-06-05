@@ -55,10 +55,8 @@ chromium chromium-chromedriver font-wqy-zenhei
 ```
 chromium chromium-driver fonts-wqy-zenhei
 ```
-环境变量添加
+#### 环境变量添加
 `NS_COOKIE` Nodeseek的cookie。
-选择是否开启水帖
-`NS_COMMENT`:是否开启水帖评论默认 true/false（可选，默认 true）
 
 ## 注意事项
 
