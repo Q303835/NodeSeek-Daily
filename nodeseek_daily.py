@@ -46,7 +46,7 @@ def send_notification(title, content):
     调用青龙面板自带的通知系统
     """
     global NS_USER
-    full_title = f"NodeSeek[{NS_USER}] - {title}"
+    full_title = f"NodeSeek - [{NS_USER}] - {title}"
     print(f"📣 尝试发送通知: [{full_title}] {content}")
     try:
         from notify import send
