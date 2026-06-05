@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 任务名称
-name: NodeSeek签到与评论(青龙版)
+name: NodeSeek签到与评论
 定时规则
 cron: 25 6 * * *
 """
 import os
+import re
 import random
 import time
 import traceback
@@ -36,12 +37,16 @@ TASK_STATUS = {
     "chicken_leg": "未执行"
 }
 
+# 全局变量存储用户名
+NS_USER = "未知用户"
+
 # ==================== 青龙通知模块引入 ====================
 def send_notification(title, content):
     """
     调用青龙面板自带的通知系统
     """
-    full_title = f"NodeSeek - {title}"
+    global NS_USER
+    full_title = f"NodeSeek[{NS_USER}] - {title}"
     print(f"📣 尝试发送通知: [{full_title}] {content}")
     try:
         from notify import send
@@ -110,12 +115,50 @@ def setup_driver_and_cookies():
                     print(f"⚠️ 设置单条 cookie 出错: {str(e)}")
                     continue
         
-        print("🔄 刷新页面使登录态生效...")
+        print("🔄 刷新页面使登录态生效并获取用户信息...")
         driver.get('https://www.nodeseek.com/')
-        time.sleep(5) 
+        time.sleep(4) 
         
         if '登录' in driver.page_source and '注册' in driver.page_source:
              print("⚠️ 警告：似乎未成功登录，Cookie 可能已过期。")
+        else:
+             global NS_USER
+             try:
+                 # 等待包含用户名的外层区域渲染出来
+                 WebDriverWait(driver, 10).until(
+                     EC.presence_of_element_located((By.CSS_SELECTOR, "a.Username, a[href^='/space/'][title], img[alt][class*='avatar']"))
+                 )
+                 
+                 # 终极方案：直接用 JS 在页面内寻找目标属性，防止 Selenium 的文本可见性拦截
+                 js_extract_user = """
+                 var el1 = document.querySelector('a.Username');
+                 if (el1 && el1.innerText.trim()) return el1.innerText.trim();
+                 
+                 var el2 = document.querySelector('a[href^="/space/"][title]');
+                 if (el2 && el2.getAttribute('title').trim()) return el2.getAttribute('title').trim();
+                 
+                 var el3 = document.querySelector('img[alt][class*="avatar"]');
+                 if (el3 && el3.getAttribute('alt').trim()) return el3.getAttribute('alt').trim();
+                 
+                 return null;
+                 """
+                 
+                 extracted_name = driver.execute_script(js_extract_user)
+                 
+                 if extracted_name:
+                     NS_USER = extracted_name
+                     print(f"👤 成功锁定当前登录用户: {NS_USER}")
+                 else:
+                     raise Exception("JS 未能在节点中提取到有效文本")
+                     
+             except Exception as e:
+                 # 备用方案：兜底正则
+                 match = re.search(r'"username":"([^"]+)"', driver.page_source)
+                 if match:
+                     NS_USER = match.group(1)
+                     print(f"👤 成功锁定当前登录用户(备用正则): {NS_USER}")
+                 else:
+                     print(f"⚠️ 获取用户名时发生异常 (不影响核心任务): {str(e)}")
              
         return driver
         
@@ -126,30 +169,23 @@ def setup_driver_and_cookies():
         return None
 
 def click_sign_icon(driver):
-    """
-    修改后：直接在 /board 页面点击奖励按钮，无需寻找顶部签到小图标
-    """
     global TASK_STATUS
     try:
         print("🔍 开始检查签到状态...")
-        # 直接跳转到签到面板
         driver.get('https://www.nodeseek.com/board')
         time.sleep(5)
         
         page_source = driver.page_source
         
-        # 1. 判断是否已经签到
-        if '已经签过到' in page_source or '已签到' in page_source or '你今天已经签过到了' in page_source:
-            print("🎉 提示：今天已经签到过啦！")
+        if any(kw in page_source for kw in ['今日签到获得', '当前排名第', '已经签过到', '你今天已经签过到了']):
+            print("🎉 提示：今天已签到，请勿重复签到！")
             TASK_STATUS["sign"] = "今日已签"
             return True
             
-        # 2. 定位具体的签到按钮并点击
         target_text = '试试手气' if ns_random else '鸡腿 x 5'
         print(f"🎯 准备直接点击选项: [{target_text}]")
         
         try:
-            # 匹配类似 <button class="btn">鸡腿 x 5</button> 的元素
             click_button = WebDriverWait(driver, 10).until(
                 EC.element_to_be_clickable((By.XPATH, f"//button[contains(text(), '{target_text}')]"))
             )
