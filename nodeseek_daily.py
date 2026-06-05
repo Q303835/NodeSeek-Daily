@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 任务名称
-name: NodeSeek模拟点击签到与随机评论互动(青龙版)
+name: NodeSeek签到与评论(青龙版)
 定时规则
 cron: 25 6 * * *
 """
