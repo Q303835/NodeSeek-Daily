@@ -124,21 +124,27 @@ def setup_driver_and_cookies():
         else:
              global NS_USER
              try:
-                 # 等待包含用户名的外层区域渲染出来
-                 WebDriverWait(driver, 10).until(
-                     EC.presence_of_element_located((By.CSS_SELECTOR, "a.Username, a[href^='/space/'][title], img[alt][class*='avatar']"))
+                 # 1. 扩大等待的组件范围，优先保证承载用户名的卡片容器加载完成
+                 WebDriverWait(driver, 15).until(
+                     EC.presence_of_element_located((By.CSS_SELECTOR, "div.user-card, a.Username, a[href^='/space/']"))
                  )
                  
-                 # 终极方案：直接用 JS 在页面内寻找目标属性，防止 Selenium 的文本可见性拦截
+                 # 2. 升级版精细化 JS 提取方案（针对新版带有 data-v-xxx 特征的 DOM 层级进行精准打击）
                  js_extract_user = """
+                 // 优先寻找带有 Username 类的 A 标签
                  var el1 = document.querySelector('a.Username');
                  if (el1 && el1.innerText.trim()) return el1.innerText.trim();
                  
-                 var el2 = document.querySelector('a[href^="/space/"][title]');
-                 if (el2 && el2.getAttribute('title').trim()) return el2.getAttribute('title').trim();
+                 // 寻找包含 /space/ 个人空间路由的 A 标签文本
+                 var el2 = document.querySelector('a[href^="/space/"]');
+                 if (el2 && el2.innerText.trim()) return el2.innerText.trim();
                  
-                 var el3 = document.querySelector('img[alt][class*="avatar"]');
-                 if (el3 && el3.getAttribute('alt').trim()) return el3.getAttribute('alt').trim();
+                 // 如果文本还没渲染，尝试抓取 A 标签的 title 属性
+                 if (el2 && el2.getAttribute('title')) return el2.getAttribute('title').trim();
+                 
+                 // 针对新版组件链路 (.user-card -> .user-head -> .menu -> a) 强力提取
+                 var el3 = document.querySelector('.user-card .user-head .menu a');
+                 if (el3 && el3.innerText.trim()) return el3.innerText.trim();
                  
                  return null;
                  """
@@ -149,17 +155,22 @@ def setup_driver_and_cookies():
                      NS_USER = extracted_name
                      print(f"👤 成功锁定当前登录用户: {NS_USER}")
                  else:
-                     raise Exception("JS 未能在节点中提取到有效文本")
+                     raise Exception("精细化 JS 未能在页面节点中捕获到有效文本")
                      
              except Exception as e:
-                 # 备用方案：兜底正则
-                 match = re.search(r'"username":"([^"]+)"', driver.page_source)
+                 # 3. 备用方案：多层级正则兜底（同时匹配 JSON 数据及直接的 HTML 标签）
+                 page_source = driver.page_source
+                 match = re.search(r'"username"\s*:\s*"([^"]+)"', page_source)
+                 if not match:
+                     # 针对网页源码里裸露的标签进行正则抓取
+                     match = re.search(r'class="Username"[^>]*>([^<]+)</a>', page_source)
+                 
                  if match:
-                     NS_USER = match.group(1)
+                     NS_USER = match.group(1).strip()
                      print(f"👤 成功锁定当前登录用户(备用正则): {NS_USER}")
                  else:
                      print(f"⚠️ 获取用户名时发生异常 (不影响核心任务): {str(e)}")
-             
+                     
         return driver
         
     except Exception as e:
