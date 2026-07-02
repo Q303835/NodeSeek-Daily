@@ -15,11 +15,16 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
-
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # 兼容青龙面板，如果没装这个库就默默跳过
 # 环境变量获取
 ns_random = os.environ.get("NS_RANDOM", "false").lower() == "true"
 cookie_env = os.environ.get("NS_COOKIE") or os.environ.get("COOKIE")
 headless = os.environ.get("HEADLESS", "true").lower() == "true"
+enable_comment = os.environ.get("NS_COMMENT", "false").lower() == "true"
 
 randomInputStr = [
     "路过帮顶",
@@ -85,8 +90,9 @@ def setup_driver_and_cookies():
         print("🚀 正在启动 Chrome...")
         driver = uc.Chrome(
             options=options,
-            driver_executable_path='/usr/bin/chromedriver',
-            browser_executable_path='/usr/bin/chromium-browser'
+            version_main=145,
+            # driver_executable_path='/usr/bin/chromedriver',
+            # browser_executable_path='/usr/bin/chromium-browser'
         )
         
         if headless:
@@ -365,8 +371,11 @@ if __name__ == "__main__":
     print("---------- NodeSeek 模拟点击签到与互动任务开始 ----------")
     driver = setup_driver_and_cookies()
     if driver:
-        # 1. 执行互动水贴与加鸡腿
-        nodeseek_comment(driver)
+        # 1. 根据环境变量决定是否执行互动水贴与加鸡腿
+        if enable_comment:
+            nodeseek_comment(driver)
+        else:
+            print("🚫 评论功能已默认禁用，跳过互动和水贴操作。")
         
         # 2. 执行核心签到任务
         click_sign_icon(driver)
