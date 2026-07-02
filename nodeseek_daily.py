@@ -90,9 +90,8 @@ def setup_driver_and_cookies():
         print("🚀 正在启动 Chrome...")
         driver = uc.Chrome(
             options=options,
-            version_main=145,
-            # driver_executable_path='/usr/bin/chromedriver',
-            # browser_executable_path='/usr/bin/chromium-browser'
+            driver_executable_path='/usr/bin/chromedriver',
+            browser_executable_path='/usr/bin/chromium-browser'
         )
         
         if headless:
